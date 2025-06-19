@@ -139,6 +139,8 @@ export async function getCollectionById(id: string): Promise<Collection | null> 
 
 export async function getCollectionCards(collectionId: string): Promise<CardInCollection[]> {
   try {
+    console.log('Fetching cards for collection:', collectionId);
+    
     // First, get all collection cards
     const { data: collectionCardsData, error: collectionCardsError } = await supabase
       .from('collection_cards')
@@ -150,12 +152,15 @@ export async function getCollectionCards(collectionId: string): Promise<CardInCo
       return [];
     }
 
+    console.log('Collection cards found:', collectionCardsData?.length || 0);
+    
     if (!collectionCardsData || collectionCardsData.length === 0) {
       return [];
     }
 
     // Extract all card IDs
     const cardIds = collectionCardsData.map(item => item.card_id);
+    console.log('Card IDs to fetch:', cardIds);
 
     // Fetch the cards separately
     const { data: cardsData, error: cardsError } = await supabase
@@ -168,6 +173,8 @@ export async function getCollectionCards(collectionId: string): Promise<CardInCo
       return [];
     }
 
+    console.log('Cards data found:', cardsData?.length || 0);
+    
     // Create a map of card ID to card data for quick lookup
     const cardsMap: Record<string, PokemonCard> = {};
     cardsData?.forEach(card => {
@@ -186,8 +193,14 @@ export async function getCollectionCards(collectionId: string): Promise<CardInCo
       };
     });
 
+    // Check if any cards are missing from the map
+    const missingCardIds = cardIds.filter(id => !cardsMap[id]);
+    if (missingCardIds.length > 0) {
+      console.warn('Some cards were not found in the database:', missingCardIds);
+    }
+
     // Combine the data
-    return collectionCardsData.map(item => ({
+    const result = collectionCardsData.map(item => ({
       id: item.id,
       cardId: item.card_id,
       collectionId: item.collection_id,
@@ -195,9 +208,12 @@ export async function getCollectionCards(collectionId: string): Promise<CardInCo
       purchaseDate: item.purchase_date || undefined,
       condition: item.condition || undefined,
       notes: item.notes || undefined,
-      quantity: item.quantity,
+      quantity: item.quantity || 1,
       card: cardsMap[item.card_id]
     }));
+    
+    console.log('Final mapped collection cards:', result.length);
+    return result;
   } catch (error) {
     console.error('Error in getCollectionCards:', error);
     return [];
@@ -212,23 +228,29 @@ export async function addCardToCollection(
   condition?: string,
   notes?: string
 ): Promise<boolean> {
-    const { error } = await supabase
+    console.log('Adding card to collection:', { cardId, collectionId });
+    
+    const { data, error } = await supabase
       .from('collection_cards')
       .insert({
-      card_id: cardId,
+        card_id: cardId,
         collection_id: collectionId,
-      purchase_price: purchasePrice,
-      purchase_date: purchaseDate,
-      condition,
-      notes
-      });
+        purchase_price: purchasePrice,
+        purchase_date: purchaseDate,
+        condition,
+        notes,
+        quantity: 1 // Ensure quantity is set
+      })
+      .select()
+      .single();
     
-  if (error) {
-    console.error('Error adding card to collection:', error);
-    return false;
-  }
+    if (error) {
+      console.error('Error adding card to collection:', error);
+      return false;
+    }
 
-  return true;
+    console.log('Card successfully added to collection:', data);
+    return true;
 }
 
 export async function removeCardFromCollection(cardInCollectionId: string): Promise<boolean> {

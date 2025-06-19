@@ -125,8 +125,25 @@ export function CollectionDetailPage() {
   };
 
   useEffect(() => {
-    loadCollection();
-    loadCards();
+    if (id) {
+      console.log('Collection ID changed, reloading data:', id);
+      loadCollection();
+      loadCards();
+    }
+  }, [id]);
+  
+  // Add another effect to reload data when the component mounts or when navigating back to this page
+  useEffect(() => {
+    const handleFocus = () => {
+      if (id) {
+        console.log('Window focused, refreshing collection data');
+        loadCollection();
+        loadCards();
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, [id]);
 
   const handleDeleteCollection = async () => {
