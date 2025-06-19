@@ -69,13 +69,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
+  // Get the current origin with the correct port
+  const getRedirectOrigin = () => {
+    // Use the current window location including the port
+    return window.location.origin;
+  };
+
   const signUp = async (email: string, password: string, username: string) => {
     // First, sign up the user with Supabase Auth
     const { data, error } = await supabase.auth.signUp({ 
       email, 
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/login`,
+        emailRedirectTo: `${getRedirectOrigin()}/login`,
         data: {
           username
         }
@@ -136,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${getRedirectOrigin()}/reset-password`,
     });
     return { error };
   };
@@ -150,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       type: 'signup',
       email: user.email,
       options: {
-        emailRedirectTo: `${window.location.origin}/login`,
+        emailRedirectTo: `${getRedirectOrigin()}/login`,
       }
     });
     

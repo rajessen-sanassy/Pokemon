@@ -30,22 +30,19 @@ export function RegisterPage() {
     
     setIsCheckingUsername(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?username=eq.${encodeURIComponent(username)}&select=id`,
-        {
-          headers: {
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-          }
-        }
-      );
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .maybeSingle();
       
-      if (!response.ok) {
-        throw new Error('Failed to check username availability');
+      if (error) {
+        console.error('Error checking username:', error);
+        return false;
       }
       
-      const data = await response.json();
-      return data.length === 0;
+      // If no data is returned, the username is available
+      return !data;
     } catch (error) {
       console.error('Error checking username:', error);
       return false;

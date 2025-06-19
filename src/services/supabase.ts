@@ -8,9 +8,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
+// Remove any trailing % from the key if present (common copy-paste error)
+const cleanedAnonKey = supabaseAnonKey.endsWith('%') 
+  ? supabaseAnonKey.slice(0, -1) 
+  : supabaseAnonKey;
+
 export const supabase = createClient<Database>(
   supabaseUrl, 
-  supabaseAnonKey,
+  cleanedAnonKey,
   {
     auth: {
       persistSession: true,
