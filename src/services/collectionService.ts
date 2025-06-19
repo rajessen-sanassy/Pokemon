@@ -334,6 +334,8 @@ export async function removeCardFromCollection(cardInCollectionId: string): Prom
 
 export async function getCollectionValue(collectionId: string): Promise<number> {
   try {
+    console.log('Calculating value for collection:', collectionId);
+    
     // First, get all collection cards for this collection
     const { data: collectionCardsData, error: collectionCardsError } = await supabase
       .from('collection_cards')
@@ -346,35 +348,54 @@ export async function getCollectionValue(collectionId: string): Promise<number> 
     }
 
     if (!collectionCardsData || collectionCardsData.length === 0) {
+      console.log('No cards found in collection');
       return 0;
     }
 
-    // Extract all card IDs
+    console.log(`Found ${collectionCardsData.length} cards in collection`);
+
+    // Import the pokemonCardApi module for ID encoding
+    const { encodeCardId } = await import('./pokemonCardApi');
+    
+    // Extract all card IDs and encode them for database lookup
     const cardIds = collectionCardsData.map(item => item.card_id);
+    const encodedCardIds = cardIds.map(id => encodeCardId(id));
+    
+    console.log('Encoded card IDs for lookup:', encodedCardIds);
 
     // Fetch the market prices separately
     const { data: cardsData, error: cardsError } = await supabase
       .from('cards')
-      .select('id, market_price')
-      .in('id', cardIds);
+      .select('id, original_id, market_price')
+      .in('id', encodedCardIds);
 
     if (cardsError) {
       console.error('Error fetching card prices:', cardsError);
       return 0;
     }
 
+    console.log(`Found ${cardsData?.length || 0} cards with prices`);
+
     // Create a map of card ID to market price for quick lookup
     const pricesMap: Record<string, number> = {};
     cardsData?.forEach(card => {
+      // Use original_id as the key to match with collection_cards
+      if (card.original_id) {
+        pricesMap[card.original_id] = card.market_price || 0;
+      }
+      // Also map by encoded ID
       pricesMap[card.id] = card.market_price || 0;
     });
 
     // Calculate total value
-    return collectionCardsData.reduce((total, item) => {
+    const totalValue = collectionCardsData.reduce((total, item) => {
       const cardPrice = pricesMap[item.card_id] || 0;
       const quantity = item.quantity || 1;
       return total + (cardPrice * quantity);
     }, 0);
+    
+    console.log('Total collection value calculated:', totalValue);
+    return totalValue;
   } catch (error) {
     console.error('Error calculating collection value:', error);
     return 0;
@@ -548,9 +569,11 @@ export async function deleteCollection(id: string): Promise<boolean> {
   return true;
 }
 
-// Fix the getCollectionCardPreviews function to use the correct database schema
+// Get card previews for collection display
 export async function getCollectionCardPreviews(collectionId: string, limit: number = 9): Promise<any[]> {
   try {
+    console.log('Fetching card previews for collection:', collectionId);
+    
     // First, get collection cards with limit
     const { data: collectionCardsData, error: collectionCardsError } = await supabase
       .from('collection_cards')
@@ -559,24 +582,41 @@ export async function getCollectionCardPreviews(collectionId: string, limit: num
       .limit(limit);
 
     if (collectionCardsError || !collectionCardsData || collectionCardsData.length === 0) {
+      console.log('No cards found for previews');
       return [];
     }
 
-    // Extract card IDs
-    const cardIds = collectionCardsData.map(item => item.card_id);
-
-    // Fetch the card data
-    const { data: cardsData, error: cardsError } = await supabase
-      .from('cards')
-      .select('id, name, image_url')
-      .in('id', cardIds);
-
-    if (cardsError) {
-      console.error('Error fetching card previews:', cardsError);
-      return [];
-    }
-
-    return cardsData || [];
+    console.log(`Found ${collectionCardsData.length} cards for previews`);
+    
+    // Use the API service to get card data with proper ID handling
+    const { getCardById } = await import('./pokemonCardApi');
+    
+    // Process cards in parallel
+    const previewPromises = collectionCardsData.map(async (item) => {
+      try {
+        const cardData = await getCardById(item.card_id);
+        if (cardData) {
+          return {
+            id: item.card_id,
+            name: cardData.name,
+            image_url: cardData.imageUrl
+          };
+        }
+        return null;
+      } catch (error) {
+        console.error(`Error fetching preview for card ${item.card_id}:`, error);
+        return null;
+      }
+    });
+    
+    // Wait for all preview data to be fetched
+    const previewResults = await Promise.all(previewPromises);
+    
+    // Filter out any null results
+    const validPreviews = previewResults.filter(preview => preview !== null);
+    
+    console.log(`Successfully fetched ${validPreviews.length} card previews`);
+    return validPreviews;
   } catch (error) {
     console.error('Error in getCollectionCardPreviews:', error);
     return [];

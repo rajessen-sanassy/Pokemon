@@ -35,10 +35,16 @@ const mapApiCardToCard = (apiCard: any): PokemonCard => {
 };
 
 // Encode card ID to be safe for database operations
-function encodeCardId(id: string): string {
+export function encodeCardId(id: string): string {
   // Replace hyphens with a safe character for database operations
   // We'll use double underscores which are unlikely to appear in card IDs
   return id.replace(/-/g, '__');
+}
+
+// Decode card ID when needed
+export function decodeCardId(encodedId: string): string {
+  // Convert back from database format to original ID
+  return encodedId.replace(/__/g, '-');
 }
 
 // Save card to the database
