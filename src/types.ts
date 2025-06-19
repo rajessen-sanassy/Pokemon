@@ -4,28 +4,32 @@ export interface PokemonCard {
   name: string;
   imageUrl: string;
   setName: string;
+  setCode: string;
   cardNumber: string;
   rarity: string;
-  marketPrice: number | null;
+  artist?: string;
+  releaseDate?: string;
+  marketPrice?: number;
+  types?: string[];
 }
 
 export interface CardPrice {
-  id: string;
-  cardId: string;
-  store: string;
-  price: number;
   date: string;
+  price: number;
+  store: string;
   condition: string;
 }
 
 export interface Collection {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
   userId: string;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
+  username?: string;
+  avatarUrl?: string;
 }
 
 export interface CollectionCard {
@@ -47,8 +51,6 @@ export interface User {
   id: string;
   email: string;
   username?: string;
-  avatarUrl?: string;
-  createdAt: string;
 }
 
 // Chart types
@@ -64,4 +66,42 @@ export interface TimeSpan {
 
 export interface StoreColor {
   [store: string]: string;
+}
+
+export interface Card {
+  id: string;
+  name: string;
+  imageUrl: string;
+  setName: string;
+  setCode: string;
+  rarity: string;
+  number: string;
+  artist: string;
+  releaseDate: string;
+  marketPrice: number;
+  types?: string[];
+}
+
+export interface CardInCollection {
+  id: string;
+  cardId: string;
+  collectionId: string;
+  purchasePrice?: number;
+  purchaseDate?: string;
+  condition?: string;
+  notes?: string;
+  card?: PokemonCard;
+}
+
+export interface PriceHistory {
+  date: string;
+  price: number;
+}
+
+export interface SearchFilters {
+  types?: string[];
+  rarity?: string;
+  set?: string;
+  minPrice?: number;
+  maxPrice?: number;
 } 

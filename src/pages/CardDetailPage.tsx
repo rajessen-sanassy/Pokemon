@@ -1,13 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { 
   Box, 
   Heading, 
   Text, 
   Image, 
   Button, 
-  Grid, 
-  GridItem, 
   Badge, 
   Spinner, 
   Center,
@@ -148,15 +146,22 @@ export function CardDetailPage() {
     }
   }, [card]);
 
-  // Memoize the back to search handler
-  const handleBackToSearch = useCallback(() => {
+  // Handle back button navigation based on where user came from
+  const handleBackNavigation = useCallback(() => {
+    // Check if we came from a collection page
+    if (location.state?.fromCollection) {
+      const collectionId = location.state.collectionId;
+      navigate(`/collections/${collectionId}`);
+    } else {
+      // Default to search page
     navigate('/search', {
       state: { 
         fromCardDetail: true,
         scrollPosition: location.state?.scrollPosition || 0
       }
     });
-  }, [navigate, location.state?.scrollPosition]);
+    }
+  }, [navigate, location]);
 
   // Handle adding card to collection
   const handleAddToCollection = async () => {
@@ -164,14 +169,14 @@ export function CardDetailPage() {
     
     setAddingToCollection(true);
     try {
-      const purchaseInfo = {
-        price: purchasePrice ? parseFloat(purchasePrice) : undefined,
-        date: purchaseDate || undefined,
-        condition: condition || undefined,
-        notes: notes || undefined,
-      };
-      
-      const success = await addCardToCollection(selectedCollection, id, purchaseInfo);
+      const success = await addCardToCollection(
+        id,
+        selectedCollection,
+        purchasePrice ? parseFloat(purchasePrice) : undefined,
+        purchaseDate || undefined,
+        condition || undefined,
+        notes || undefined
+      );
       
       if (success) {
         toast({
@@ -232,12 +237,15 @@ export function CardDetailPage() {
       <Box textAlign="center" py={10}>
         <Heading size="lg">Card Not Found</Heading>
         <Text mt={4}>The card you're looking for doesn't exist or has been removed.</Text>
-        <Button mt={6} colorScheme="blue" onClick={handleBackToSearch}>
-          Back to Search
+        <Button mt={6} colorScheme="blue" onClick={handleBackNavigation}>
+          Back
         </Button>
       </Box>
     );
   }
+
+  // Determine back button text based on where user came from
+  const backButtonText = location.state?.fromCollection ? 'Back to Collection' : 'Back to Search';
 
   return (
     <Box>
@@ -245,9 +253,9 @@ export function CardDetailPage() {
         mb={4} 
         variant="outline" 
         leftIcon={<span>←</span>}
-        onClick={handleBackToSearch}
+        onClick={handleBackNavigation}
       >
-        Back to Search
+        {backButtonText}
       </Button>
       
       <Stack direction={{ base: 'column', lg: 'row' }} spacing={8} align="start">
@@ -387,7 +395,12 @@ export function CardDetailPage() {
                   colorScheme="blue" 
                   onClick={() => {
                     onClose();
-                    navigate('/collections');
+                    navigate('/collections', { 
+                      state: { 
+                        openCreateModal: true,
+                        cardId: id  // Pass the card ID
+                      }
+                    });
                   }}
                 >
                   Create a Collection

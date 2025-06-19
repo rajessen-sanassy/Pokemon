@@ -1,16 +1,22 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ChakraProvider, extendTheme } from '@chakra-ui/react';
 import { Layout } from './components/Layout';
+import { ProtectedRoute } from './components/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { SearchPage } from './pages/SearchPage';
 import { CardDetailPage } from './pages/CardDetailPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { VerifyEmailPage } from './pages/VerifyEmailPage';
+import { ChangePasswordPage } from './pages/ChangePasswordPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { CollectionsPage } from './pages/CollectionsPage';
 import { CollectionDetailPage } from './pages/CollectionDetailPage';
+import { CommunityCollectionsPage } from './pages/CommunityCollectionsPage';
 import { AuthProvider } from './context/AuthContext';
 
-// Pokemon-themed colors
+// Pokemon-themed colors with dark theme
 const theme = extendTheme({
   styles: {
     global: {
@@ -31,19 +37,21 @@ const theme = extendTheme({
   colors: {
     pokemon: {
       red: '#EE1515',
-      blue: '#3B4CCA',
+      blue: '#3B4CCA', // Keeping for backward compatibility
+      darkBlue: '#0A285F', // Keeping for backward compatibility
       yellow: '#FFDE00',
-      darkBlue: '#0A285F',
-      lightBlue: '#0075BE',
       lightYellow: '#FFCC00',
       white: '#FFFFFF',
-      black: '#000000',
-      gray: '#B3B3B3',
+      black: '#121212',
+      darkGray: '#1E1E1E',
+      mediumGray: '#2D2D2D',
+      lightGray: '#3D3D3D',
+      accent: '#FFDE00', // Yellow as accent color
     },
     blue: {
-      500: '#3B4CCA', // Pokemon blue
-      600: '#0A285F', // Pokemon dark blue
-      700: '#0A285F', // Pokemon dark blue
+      500: '#1E1E1E', // Changed to dark gray
+      600: '#121212', // Changed to black
+      700: '#121212', // Changed to black
     },
     yellow: {
       500: '#FFDE00', // Pokemon yellow
@@ -60,17 +68,17 @@ const theme = extendTheme({
       },
       variants: {
         solid: {
-          bg: 'pokemon.blue',
+          bg: 'pokemon.black',
           color: 'white',
           _hover: {
-            bg: 'pokemon.darkBlue',
+            bg: 'pokemon.darkGray',
           }
         },
         outline: {
-          borderColor: 'pokemon.blue',
-          color: 'pokemon.blue',
+          borderColor: 'pokemon.black',
+          color: 'pokemon.black',
           _hover: {
-            bg: 'pokemon.blue',
+            bg: 'pokemon.black',
             color: 'white',
           }
         },
@@ -97,8 +105,29 @@ function App() {
               <Route path="/card/:id" element={<CardDetailPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
-              <Route path="/collections" element={<CollectionsPage />} />
-              <Route path="/collections/:id" element={<CollectionDetailPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/change-password" element={
+                <ProtectedRoute>
+                  <ChangePasswordPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              } />
+              <Route path="/collections" element={
+                <ProtectedRoute>
+                  <CollectionsPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/collections/:id" element={
+                <ProtectedRoute>
+                  <CollectionDetailPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/community" element={<CommunityCollectionsPage />} />
             </Routes>
           </Layout>
         </Router>

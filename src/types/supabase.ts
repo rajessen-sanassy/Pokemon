@@ -92,6 +92,57 @@ export interface Database {
           }
         ]
       }
+      cards: {
+        Row: {
+          id: string
+          original_id: string | null
+          name: string
+          image_url: string
+          set_name: string
+          set_code: string
+          card_number: string
+          rarity: string
+          artist: string | null
+          release_date: string | null
+          market_price: number | null
+          types: string[] | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          original_id?: string | null
+          name: string
+          image_url: string
+          set_name: string
+          set_code: string
+          card_number: string
+          rarity: string
+          artist?: string | null
+          release_date?: string | null
+          market_price?: number | null
+          types?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          original_id?: string | null
+          name?: string
+          image_url?: string
+          set_name?: string
+          set_code?: string
+          card_number?: string
+          rarity?: string
+          artist?: string | null
+          release_date?: string | null
+          market_price?: number | null
+          types?: string[] | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

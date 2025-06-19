@@ -1,21 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
-  Heading, 
   Text, 
   Flex, 
-  Select, 
   Button, 
-  ButtonGroup,
-  Stack,
-  Checkbox,
-  CheckboxGroup,
   Tooltip,
   useColorModeValue,
   useBreakpointValue,
   SimpleGrid,
   Wrap,
   WrapItem,
+  Checkbox,
+  CheckboxGroup,
 } from '@chakra-ui/react';
 import { 
   LineChart, 
@@ -176,8 +172,6 @@ export function PriceChart({ prices }: PriceChartProps) {
         const mockPrice = basePrice * trendFactor * randomFactor;
         
         newPrices.push({
-          id: `mock-${store}-${mockDate.toISOString()}`,
-          cardId: samplePrice.cardId,
           store: store,
           price: Number(mockPrice.toFixed(2)),
           date: mockDate.toISOString().split('T')[0],

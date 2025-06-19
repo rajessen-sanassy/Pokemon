@@ -7,6 +7,8 @@ import {
   Flex,
   Heading,
   Text,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
 
@@ -59,9 +61,10 @@ export function LoginPage() {
         <Heading>Sign In</Heading>
         
         {error && (
-          <Text color="red.500" fontSize="sm">
-            {error}
-          </Text>
+          <Alert status="error" borderRadius="md">
+            <AlertIcon />
+            <Text>{error}</Text>
+          </Alert>
         )}
         
         <form onSubmit={handleSubmit} style={{ width: '100%' }}>
@@ -107,6 +110,7 @@ export function LoginPage() {
               colorScheme="blue"
               width="full"
               mt={4}
+              isLoading={isLoading}
               disabled={isLoading}
             >
               Sign In
@@ -114,6 +118,7 @@ export function LoginPage() {
           </Flex>
         </form>
         
+        <Flex justify="space-between" align="center" wrap="wrap" gap={2}>
         <Text>
           Don't have an account?{' '}
           <Link to="/register">
@@ -122,6 +127,13 @@ export function LoginPage() {
             </Text>
           </Link>
         </Text>
+          
+          <Link to="/reset-password">
+            <Text as="span" color="blue.500">
+              Forgot Password?
+            </Text>
+          </Link>
+        </Flex>
       </Flex>
     </Box>
   );

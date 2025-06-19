@@ -1,93 +1,84 @@
 # Pokémon Card Collector
 
-A web application for searching Pokémon cards, tracking prices across different stores, and managing your card collection.
+A web application for Pokémon card collectors to search, track, and manage their card collections.
 
 ## Features
 
-- **Search Cards**: Search for any Pokémon card and view detailed information
-- **Price Tracking**: View price history charts from various stores like eBay, TCGPlayer, and more
-- **Collection Management**: Create and manage your card collections
-- **Collection Value**: Track the total value of your collections
-- **User Authentication**: Create an account to save and manage your collections
+- **Card Search**: Search for Pokémon cards with autocomplete functionality
+- **Price Tracking**: View price history across different stores with interactive charts
+- **Collection Management**: Create collections and add cards to track your collection value
+- **Responsive Design**: Optimized for both desktop and mobile devices
+- **Authentication**: User accounts with secure authentication via Supabase
 
 ## Tech Stack
 
-- **Frontend**: React, TypeScript, Vite
+- **Frontend**: React 18 with TypeScript
 - **UI Library**: Chakra UI
-- **Routing**: React Router
-- **Charts**: Recharts
-- **Backend/Auth**: Supabase
+- **API Integration**: Pokémon TCG API
+- **Backend & Auth**: Supabase
+- **Build Tool**: Vite
+
+## Project Structure
+
+```
+
+─ public/              # Static assets
+─ src/                 # Source code
+  ├── components/      # Reusable UI components
+  ├── context/         # React context providers
+  ├── pages/           # Page components
+  ├── services/        # API and service functions
+  ├── types/           # TypeScript type definitions
+  ├── App.tsx          # Main application component
+  ├── main.tsx         # Application entry point
+  └── index.css        # Global styles
+─ index.html           # HTML entry point
+─ package.json         # Dependencies and scripts
+─ tsconfig.json        # TypeScript configuration
+─ vite.config.ts       # Vite configuration
+```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
+- Node.js 16+
 - npm or yarn
 
 ### Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/pokemon-card-collector.git
-   cd pokemon-card-collector
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Create a `.env` file in the root directory with your Supabase credentials:
-   ```
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-5. Open your browser and navigate to `http://localhost:5173`
-
-## Project Structure
-
-```
-pokemon-card-collector/
-├── src/
-│   ├── components/     # Reusable UI components
-│   ├── context/        # React context providers
-│   ├── hooks/          # Custom React hooks
-│   ├── pages/          # Page components
-│   ├── services/       # API and service functions
-│   ├── types/          # TypeScript type definitions
-│   ├── utils/          # Utility functions
-│   ├── App.tsx         # Main App component
-│   └── main.tsx        # Entry point
-├── public/             # Static assets
-└── ...config files
+1. Clone the repository
+```bash
+git clone https://github.com/yourusername/pokemon-card-collector.git
+cd pokemon-card-collector
 ```
 
-## Database Schema
+2. Install dependencies
+```bash
+npm install
+```
 
-The application uses Supabase as the backend with the following tables:
+3. Set up environment variables
+Create a `.env` file with the following variables:
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-- **users**: User accounts (managed by Supabase Auth)
-- **collections**: Card collections created by users
-- **collection_cards**: Cards added to collections with quantity and condition
+4. Start the development server
+```bash
+npm run dev
+```
 
-## Future Enhancements
+## Building for Production
 
-- Add real Pokemon card API integration
-- Implement card filtering and sorting options
-- Add user profiles and social features
-- Enable collection sharing and trading features
-- Implement card condition tracking and grading
+```bash
+npm run build
+```
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License.
 
 ## Acknowledgments
 

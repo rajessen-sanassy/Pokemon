@@ -7,22 +7,76 @@ import {
   Flex,
   Heading,
   Text,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../services/supabase';
 
 export function RegisterPage() {
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  
+  // Check if username is already taken
+  const checkUsernameAvailability = async (username: string) => {
+    if (!username.trim()) return true;
+    
+    setIsCheckingUsername(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?username=eq.${encodeURIComponent(username)}&select=id`,
+        {
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error('Failed to check username availability');
+      }
+      
+      const data = await response.json();
+      return data.length === 0;
+    } catch (error) {
+      console.error('Error checking username:', error);
+      return false;
+    } finally {
+      setIsCheckingUsername(false);
+    }
+  };
+
+  // Check if email is already registered
+  const checkEmailAvailability = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false
+        }
+      });
+      
+      // If there's no error when trying to send OTP to a non-existent user,
+      // it means the user exists (we're not actually sending an OTP, just checking)
+      return !!error;
+    } catch (error) {
+      console.error('Error checking email:', error);
+      return false;
+    }
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !password || !confirmPassword) {
+    if (!email || !password || !confirmPassword || !username) {
       setError('Please fill in all fields');
       return;
     }
@@ -37,20 +91,54 @@ export function RegisterPage() {
       return;
     }
     
+    if (username.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+    
     setIsLoading(true);
     setError('');
     
     try {
-      const { error } = await signUp(email, password);
+      // Check if username is available
+      const isUsernameAvailable = await checkUsernameAvailability(username);
+      if (!isUsernameAvailable) {
+        setError('Username is already taken. Please choose another one.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Check if email is available
+      const isEmailAvailable = await checkEmailAvailability(email);
+      if (!isEmailAvailable) {
+        setError('Email is already registered. Please use a different email or try to log in.');
+        setIsLoading(false);
+        return;
+      }
+      
+      const { error } = await signUp(email, password, username);
       
       if (error) {
+        if (error.message.includes('already registered')) {
+          setError('Email is already registered. Please use a different email or try to log in.');
+        } else {
         setError(error.message);
+        }
       } else {
-        navigate('/login');
-        // In a real app, you might want to show a success message or automatically log the user in
+        // Redirect to verify email page instead of showing modal
+        navigate('/verify-email', { 
+          state: { 
+            email,
+            fromRegistration: true
+          } 
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message && err.message.includes('already registered')) {
+        setError('Email is already registered. Please use a different email or try to log in.');
+      } else {
       setError('An unexpected error occurred. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -71,9 +159,10 @@ export function RegisterPage() {
         <Heading>Create Account</Heading>
         
         {error && (
-          <Text color="red.500" fontSize="sm">
-            {error}
-          </Text>
+          <Alert status="error" borderRadius="md">
+            <AlertIcon />
+            <Text>{error}</Text>
+          </Alert>
         )}
         
         <form onSubmit={handleSubmit} style={{ width: '100%' }}>
@@ -92,6 +181,24 @@ export function RegisterPage() {
               {!!error && !email && (
                 <Text color="red.500" fontSize="sm" mt={1}>
                   Email is required
+                </Text>
+              )}
+            </Box>
+            
+            <Box>
+              <Text as="label" fontWeight="medium" mb={1} display="block">
+                Username
+              </Text>
+              <Input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Choose a username"
+                borderColor={!!error && !username ? "red.500" : undefined}
+              />
+              {!!error && !username && (
+                <Text color="red.500" fontSize="sm" mt={1}>
+                  Username is required
                 </Text>
               )}
             </Box>
@@ -142,7 +249,9 @@ export function RegisterPage() {
               colorScheme="blue"
               width="full"
               mt={4}
-              disabled={isLoading}
+              disabled={isLoading || isCheckingUsername}
+              isLoading={isLoading || isCheckingUsername}
+              loadingText={isCheckingUsername ? "Checking username..." : "Creating account..."}
             >
               Create Account
             </Button>

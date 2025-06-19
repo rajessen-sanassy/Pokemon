@@ -1,4 +1,5 @@
 import type { PokemonCard, CardPrice } from '../types';
+import { supabase } from './supabaseClient';
 
 // Pokemon TCG API base URL
 const API_BASE_URL = 'https://api.pokemontcg.io/v2';
@@ -19,15 +20,99 @@ const mapApiCardToCard = (apiCard: any): PokemonCard => {
     name: apiCard.name,
     imageUrl: apiCard.images?.large || apiCard.images?.small || `https://via.placeholder.com/245x342.png?text=${encodeURIComponent(apiCard.name)}`,
     setName: apiCard.set?.name || 'Unknown Set',
+    setCode: apiCard.set?.id || 'unknown',
     cardNumber: `${apiCard.number || '?'}/${apiCard.set?.printedTotal || apiCard.set?.total || '?'}`,
     rarity: apiCard.rarity || 'Unknown',
+    artist: apiCard.artist || 'Unknown',
+    releaseDate: apiCard.set?.releaseDate || null,
     marketPrice: apiCard.cardmarket?.prices?.averageSellPrice || 
                 apiCard.cardmarket?.prices?.trendPrice || 
                 apiCard.tcgplayer?.prices?.holofoil?.market || 
                 apiCard.tcgplayer?.prices?.normal?.market ||
                 null,
+    types: apiCard.types || [],
   };
 };
+
+// Encode card ID to be safe for database operations
+function encodeCardId(id: string): string {
+  // Replace hyphens with a safe character for database operations
+  // We'll use double underscores which are unlikely to appear in card IDs
+  return id.replace(/-/g, '__');
+}
+
+// Save card to the database
+export async function saveCardToDatabase(card: PokemonCard): Promise<boolean> {
+  try {
+    // Encode the card ID for safe database operations
+    const encodedCardId = encodeCardId(card.id);
+    
+    // Check if the card already exists
+    const { data: existingCard, error: checkError } = await supabase
+      .from('cards')
+      .select('id')
+      .filter('id', 'eq', encodedCardId)
+      .maybeSingle();
+    
+    if (checkError) {
+      console.error('Error checking if card exists:', checkError);
+      return false;
+    }
+    
+    if (existingCard) {
+      // Update the card
+      const { error: updateError } = await supabase
+        .from('cards')
+        .update({
+          name: card.name,
+          image_url: card.imageUrl,
+          set_name: card.setName,
+          set_code: card.setCode,
+          card_number: card.cardNumber,
+          rarity: card.rarity,
+          artist: card.artist,
+          release_date: card.releaseDate,
+          market_price: card.marketPrice,
+          types: card.types,
+          original_id: card.id // Store the original ID as well
+        })
+        .eq('id', encodedCardId);
+      
+      if (updateError) {
+        console.error('Error updating card in database:', updateError);
+        return false;
+      }
+    } else {
+      // Insert the card
+      const { error: insertError } = await supabase
+        .from('cards')
+        .insert({
+          id: encodedCardId,
+          original_id: card.id, // Store the original ID for reference
+          name: card.name,
+          image_url: card.imageUrl,
+          set_name: card.setName,
+          set_code: card.setCode,
+          card_number: card.cardNumber,
+          rarity: card.rarity,
+          artist: card.artist,
+          release_date: card.releaseDate,
+          market_price: card.marketPrice,
+          types: card.types
+        });
+      
+      if (insertError) {
+        console.error('Error inserting card into database:', insertError);
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error saving card to database:', error);
+    return false;
+  }
+}
 
 // Mock stores for price history (since the real API doesn't provide historical data)
 const mockStores = ['eBay', 'TCGPlayer', 'CardMarket', 'Troll and Toad', 'CoolStuffInc'];
@@ -118,7 +203,14 @@ export async function searchCards(query: string): Promise<PokemonCard[]> {
     const data = await response.json();
     
     // Map API cards to our format
-    return data.data.map(mapApiCardToCard);
+    const cards = data.data.map(mapApiCardToCard);
+    
+    // Save each card to the database
+    for (const card of cards) {
+      await saveCardToDatabase(card);
+    }
+    
+    return cards;
   } catch (error) {
     console.error('Error searching cards:', error);
     
@@ -128,17 +220,48 @@ export async function searchCards(query: string): Promise<PokemonCard[]> {
       name: `${query} ${index + 1}`,
       imageUrl: `https://via.placeholder.com/245x342.png?text=${encodeURIComponent(query)}+${index + 1}`,
       setName: ['Base Set', 'Jungle', 'Fossil', 'Team Rocket', 'Gym Heroes'][Math.floor(Math.random() * 5)],
+      setCode: ['base1', 'base2', 'base3', 'base4', 'base5'][Math.floor(Math.random() * 5)],
       cardNumber: `${Math.floor(Math.random() * 100)}/${Math.floor(Math.random() * 100) + 100}`,
       rarity: ['Common', 'Uncommon', 'Rare', 'Holo Rare', 'Ultra Rare'][Math.floor(Math.random() * 5)],
+      artist: ['Ken Sugimori', 'Mitsuhiro Arita', 'Keiji Kinebuchi'][Math.floor(Math.random() * 3)],
+      releaseDate: '2023-01-01',
       marketPrice: Math.floor(Math.random() * 1000) / 10,
+      types: [['Fire', 'Water', 'Grass', 'Electric', 'Psychic'][Math.floor(Math.random() * 5)]],
     }));
   }
 }
 
 export async function getCardById(id: string): Promise<PokemonCard | null> {
   try {
-    // Fetch card details from Pokemon TCG API
-    const response = await fetch(`${API_BASE_URL}/cards/${id}`);
+    // Encode the card ID for safe database operations
+    const encodedCardId = encodeCardId(id);
+    
+    // First check if we have this card in our database
+    const { data: dbCard, error: dbError } = await supabase
+      .from('cards')
+      .select('*')
+      .filter('id', 'eq', encodedCardId)
+      .maybeSingle();
+    
+    if (dbCard && !dbError) {
+      // Return the card from our database
+      return {
+        id: id, // Use the original ID for consistency
+        name: dbCard.name,
+        imageUrl: dbCard.image_url,
+        setName: dbCard.set_name,
+        setCode: dbCard.set_code,
+        cardNumber: dbCard.card_number,
+        rarity: dbCard.rarity,
+        artist: dbCard.artist || undefined,
+        releaseDate: dbCard.release_date || undefined,
+        marketPrice: dbCard.market_price || undefined,
+        types: dbCard.types || undefined
+      };
+    }
+    
+    // If not in database, fetch from API
+    const response = await fetch(`${API_BASE_URL}/cards/${encodeURIComponent(id)}`);
     
     if (!response.ok) {
       throw new Error(`API request failed with status ${response.status}`);
@@ -147,7 +270,12 @@ export async function getCardById(id: string): Promise<PokemonCard | null> {
     const data = await response.json();
     
     // Map API card to our format
-    return mapApiCardToCard(data.data);
+    const card = mapApiCardToCard(data.data);
+    
+    // Save the card to our database
+    await saveCardToDatabase(card);
+    
+    return card;
   } catch (error) {
     console.error('Error fetching card:', error);
     
@@ -157,9 +285,13 @@ export async function getCardById(id: string): Promise<PokemonCard | null> {
       name: `Pokemon Card ${id.substring(0, 5)}`,
       imageUrl: `https://via.placeholder.com/245x342.png?text=Card+${id.substring(0, 5)}`,
       setName: ['Base Set', 'Jungle', 'Fossil', 'Team Rocket', 'Gym Heroes'][Math.floor(Math.random() * 5)],
+      setCode: ['base1', 'base2', 'base3', 'base4', 'base5'][Math.floor(Math.random() * 5)],
       cardNumber: `${Math.floor(Math.random() * 100)}/${Math.floor(Math.random() * 100) + 100}`,
       rarity: ['Common', 'Uncommon', 'Rare', 'Holo Rare', 'Ultra Rare'][Math.floor(Math.random() * 5)],
+      artist: ['Ken Sugimori', 'Mitsuhiro Arita', 'Keiji Kinebuchi'][Math.floor(Math.random() * 3)],
+      releaseDate: '2023-01-01',
       marketPrice: Math.floor(Math.random() * 1000) / 10,
+      types: [['Fire', 'Water', 'Grass', 'Electric', 'Psychic'][Math.floor(Math.random() * 5)]],
     };
   }
 }
@@ -189,11 +321,9 @@ export async function getCardPrices(cardId: string): Promise<CardPrice[]> {
         const price = Math.max(0.99, basePrice + fluctuation);
         
         prices.push({
-          id: `price-${store}-${i}-${cardId}`,
-          cardId,
-          store,
-          price: parseFloat(price.toFixed(2)),
           date: date.toISOString().split('T')[0],
+          price: parseFloat(price.toFixed(2)),
+          store,
           condition: ['Mint', 'Near Mint', 'Excellent', 'Good', 'Poor'][Math.floor(Math.random() * 5)],
         });
       }
