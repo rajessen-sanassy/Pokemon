@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Collection, CardInCollection, PokemonCard } from '../types';
+import type { Collection, CardInCollection } from '../types';
 
 export async function getUserCollections(userId: string): Promise<Collection[]> {
     const { data, error } = await supabase
@@ -164,29 +164,53 @@ export async function getCollectionCards(collectionId: string): Promise<CardInCo
     // For each card in the collection, fetch its data using the API service
     // This will ensure we have the most up-to-date data and handle any ID encoding issues
     const result: CardInCollection[] = [];
+    const failedCardIds: string[] = [];
     
-    for (const item of collectionCardsData) {
-      try {
-        const cardData = await getCardById(item.card_id);
-        
-        if (cardData) {
-          result.push({
-            id: item.id,
-            cardId: item.card_id,
-            collectionId: item.collection_id,
-            purchasePrice: item.purchase_price || undefined,
-            purchaseDate: item.purchase_date || undefined,
-            condition: item.condition || undefined,
-            notes: item.notes || undefined,
-
-            card: cardData
-          });
-        } else {
-          console.warn(`Card data not found for ID: ${item.card_id}`);
+    // Process cards in batches to avoid overwhelming the API
+    const batchSize = 5;
+    for (let i = 0; i < collectionCardsData.length; i += batchSize) {
+      const batch = collectionCardsData.slice(i, i + batchSize);
+      
+      // Process each batch in parallel
+      const batchPromises = batch.map(async (item) => {
+        try {
+          // Try to get the card data
+          const cardData = await getCardById(item.card_id);
+          
+          if (cardData) {
+            return {
+              id: item.id,
+              cardId: item.card_id,
+              collectionId: item.collection_id,
+              purchasePrice: item.purchase_price || undefined,
+              purchaseDate: item.purchase_date || undefined,
+              condition: item.condition || undefined,
+              notes: item.notes || undefined,
+              card: cardData
+            };
+          } else {
+            failedCardIds.push(item.card_id);
+            return null;
+          }
+        } catch (cardError) {
+          console.error(`Error fetching card ${item.card_id}:`, cardError);
+          failedCardIds.push(item.card_id);
+          return null;
         }
-      } catch (cardError) {
-        console.error(`Error fetching card ${item.card_id}:`, cardError);
-      }
+      });
+      
+      // Wait for all cards in this batch to be processed
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Add successful results to our final array
+      batchResults.forEach(item => {
+        if (item) result.push(item);
+      });
+    }
+    
+    // Log any failed cards
+    if (failedCardIds.length > 0) {
+      console.warn(`Failed to fetch data for ${failedCardIds.length} cards:`, failedCardIds);
     }
     
     console.log('Final mapped collection cards:', result.length);
@@ -208,13 +232,59 @@ export async function addCardToCollection(
     console.log('Adding card to collection:', { cardId, collectionId });
     
     try {
-      // First, make sure the card exists in our database by fetching it from the API
+      // Validate inputs
+      if (!cardId || !collectionId) {
+        console.error('Missing required parameters:', { cardId, collectionId });
+        return false;
+      }
+      
+      // First, check if the card is already in the collection to avoid duplicates
+      const { data: existingCards, error: checkError } = await supabase
+        .from('collection_cards')
+        .select('id')
+        .eq('card_id', cardId)
+        .eq('collection_id', collectionId);
+        
+      if (checkError) {
+        console.error('Error checking for existing card in collection:', checkError);
+      } else if (existingCards && existingCards.length > 0) {
+        console.log('Card already exists in collection, skipping add');
+        return true; // Return true because the card is already in the collection
+      }
+      
+      // Make sure the card exists in our database by fetching it from the API
       // This will save it to the database if it doesn't exist
       const { getCardById } = await import('./pokemonCardApi');
-      const card = await getCardById(cardId);
+      
+      // Try up to 3 times to fetch the card data (with exponential backoff)
+      let card = null;
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (!card && attempts < maxAttempts) {
+        try {
+          attempts++;
+          card = await getCardById(cardId);
+          if (card) break;
+          
+          console.warn(`Attempt ${attempts}/${maxAttempts}: Failed to fetch card data for ID: ${cardId}`);
+          
+          // Wait with exponential backoff before retrying
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts - 1)));
+          }
+        } catch (fetchError) {
+          console.error(`Attempt ${attempts}/${maxAttempts}: Error fetching card:`, fetchError);
+          
+          // Wait with exponential backoff before retrying
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempts - 1)));
+          }
+        }
+      }
       
       if (!card) {
-        console.error('Failed to fetch card data for ID:', cardId);
+        console.error(`Failed to fetch card data for ID: ${cardId} after ${maxAttempts} attempts`);
         return false;
       }
       
