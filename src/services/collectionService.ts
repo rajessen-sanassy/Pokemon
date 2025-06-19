@@ -158,59 +158,36 @@ export async function getCollectionCards(collectionId: string): Promise<CardInCo
       return [];
     }
 
-    // Extract all card IDs
-    const cardIds = collectionCardsData.map(item => item.card_id);
-    console.log('Card IDs to fetch:', cardIds);
-
-    // Fetch the cards separately
-    const { data: cardsData, error: cardsError } = await supabase
-      .from('cards')
-      .select('*')
-      .in('id', cardIds);
+    // Import the pokemonCardApi module
+    const { getCardById } = await import('./pokemonCardApi');
     
-    if (cardsError) {
-      console.error('Error fetching cards:', cardsError);
-      return [];
-    }
-
-    console.log('Cards data found:', cardsData?.length || 0);
+    // For each card in the collection, fetch its data using the API service
+    // This will ensure we have the most up-to-date data and handle any ID encoding issues
+    const result: CardInCollection[] = [];
     
-    // Create a map of card ID to card data for quick lookup
-    const cardsMap: Record<string, PokemonCard> = {};
-    cardsData?.forEach(card => {
-      cardsMap[card.id] = {
-        id: card.id,
-        name: card.name,
-        imageUrl: card.image_url,
-        setName: card.set_name,
-        setCode: card.set_code,
-        cardNumber: card.card_number,
-        rarity: card.rarity,
-        artist: card.artist || undefined,
-        releaseDate: card.release_date || undefined,
-        marketPrice: card.market_price || undefined,
-        types: card.types || undefined
-      };
-    });
+    for (const item of collectionCardsData) {
+      try {
+        const cardData = await getCardById(item.card_id);
+        
+        if (cardData) {
+          result.push({
+            id: item.id,
+            cardId: item.card_id,
+            collectionId: item.collection_id,
+            purchasePrice: item.purchase_price || undefined,
+            purchaseDate: item.purchase_date || undefined,
+            condition: item.condition || undefined,
+            notes: item.notes || undefined,
 
-    // Check if any cards are missing from the map
-    const missingCardIds = cardIds.filter(id => !cardsMap[id]);
-    if (missingCardIds.length > 0) {
-      console.warn('Some cards were not found in the database:', missingCardIds);
+            card: cardData
+          });
+        } else {
+          console.warn(`Card data not found for ID: ${item.card_id}`);
+        }
+      } catch (cardError) {
+        console.error(`Error fetching card ${item.card_id}:`, cardError);
+      }
     }
-
-    // Combine the data
-    const result = collectionCardsData.map(item => ({
-      id: item.id,
-      cardId: item.card_id,
-      collectionId: item.collection_id,
-      purchasePrice: item.purchase_price || undefined,
-      purchaseDate: item.purchase_date || undefined,
-      condition: item.condition || undefined,
-      notes: item.notes || undefined,
-      quantity: item.quantity || 1,
-      card: cardsMap[item.card_id]
-    }));
     
     console.log('Final mapped collection cards:', result.length);
     return result;
@@ -230,27 +207,45 @@ export async function addCardToCollection(
 ): Promise<boolean> {
     console.log('Adding card to collection:', { cardId, collectionId });
     
-    const { data, error } = await supabase
-      .from('collection_cards')
-      .insert({
-        card_id: cardId,
-        collection_id: collectionId,
-        purchase_price: purchasePrice,
-        purchase_date: purchaseDate,
-        condition,
-        notes,
-        quantity: 1 // Ensure quantity is set
-      })
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('Error adding card to collection:', error);
+    try {
+      // First, make sure the card exists in our database by fetching it from the API
+      // This will save it to the database if it doesn't exist
+      const { getCardById } = await import('./pokemonCardApi');
+      const card = await getCardById(cardId);
+      
+      if (!card) {
+        console.error('Failed to fetch card data for ID:', cardId);
+        return false;
+      }
+      
+      console.log('Card data fetched successfully:', card.name);
+      
+      // Now add the card to the collection using the same ID format
+      const { data, error } = await supabase
+        .from('collection_cards')
+        .insert({
+          card_id: cardId,
+          collection_id: collectionId,
+          purchase_price: purchasePrice,
+          purchase_date: purchaseDate,
+          condition,
+          notes,
+          quantity: 1 // Ensure quantity is set
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error adding card to collection:', error);
+        return false;
+      }
+
+      console.log('Card successfully added to collection:', data);
+      return true;
+    } catch (error) {
+      console.error('Error in addCardToCollection:', error);
       return false;
     }
-
-    console.log('Card successfully added to collection:', data);
-    return true;
 }
 
 export async function removeCardFromCollection(cardInCollectionId: string): Promise<boolean> {
