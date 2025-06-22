@@ -246,7 +246,7 @@ export function HomePage() {
 
       {/* Attribution */}
       <Box textAlign="center" py={4} opacity={0.6}>
-        <Text fontSize="xs">Brought to you by Big Budda Bains</Text>
+        <Text fontSize="xs">Sponsored by Big Bunda Bains</Text>
       </Box>
     </Box>
   );
